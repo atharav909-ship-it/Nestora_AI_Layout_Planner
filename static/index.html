@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nestora — AI Bathroom Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { fontFamily: { sans: ['DM Sans','sans-serif'], serif: ['Playfair Display','serif'] } } } };
+  </script>
+  <link rel="stylesheet" href="/static/style.css?v=20260918d">
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+  <div id="toast" class="toast"></div>
+
+  <header class="topbar">
+    <div class="brand-wrap">
+      <div class="brand-mark">✦</div>
+      <div>
+        <div class="brand-name">Nestora</div>
+        <div class="brand-sub">AI Bathroom Studio</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span id="headerTheme" class="theme-pill">Modern Cozy</span>
+      <button id="savedDesignsBtn" class="ghost-btn">My designs</button>
+      <button id="headerSaveBtn" class="ghost-btn hidden">Save design</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- SETUP -->
+    <section id="setupView" class="setup-view">
+      <div class="setup-copy">
+        <div class="eyebrow">AI-ASSISTED SPACE PLANNING</div>
+        <h1>Design a bathroom<br><em>that feels like home.</em></h1>
+        <p>Start with your room, choose a mood, and let the planner build layouts that respect space, clearance and budget.</p>
+      </div>
+
+      <div class="setup-grid">
+        <section class="setup-card setup-theme-card">
+          <div class="card-heading">
+            <div><span class="step-num">01</span><h2>Choose a mood</h2></div>
+            <span class="muted">Style can be changed later</span>
+          </div>
+          <div id="themeGrid" class="theme-grid"></div>
+        </section>
+
+        <section class="setup-card setup-tile-card">
+          <div class="card-heading">
+            <div><span class="step-num">02</span><h2>Choose your tile</h2></div>
+            <span class="muted">Floor + wall palette</span>
+          </div>
+          <div id="tileGrid" class="tile-grid"></div>
+          <div id="marbleControls" class="marble-controls hidden"></div>
+        </section>
+
+        <section class="setup-card">
+          <div class="card-heading">
+            <div><span class="step-num">03</span><h2>Define your space</h2></div>
+            <span class="muted">Use a photo or enter dimensions</span>
+          </div>
+
+          <label id="uploadZone" class="upload-zone">
+            <input id="roomPhoto" type="file" accept="image/*">
+            <div class="upload-icon">⌁</div>
+            <div>
+              <strong>Analyze a room photo</strong>
+              <span id="uploadText">Gemini can estimate dimensions and door position</span>
+            </div>
+          </label>
+
+          <div class="input-grid">
+            <label>Length (ft)<input id="roomLength" type="number" min="4" max="30" step="0.5" value="10"></label>
+            <label>Width (ft)<input id="roomWidth" type="number" min="4" max="25" step="0.5" value="8"></label>
+          </div>
+
+          <div class="field-label">Entrance door</div>
+          <div class="segmented" id="doorGroup">
+            <button data-door="bottom_left" class="selected">Bottom left</button>
+            <button data-door="bottom_right">Bottom right</button>
+          </div>
+
+          <div class="budget-row">
+            <div class="field-label">Target budget</div>
+            <output id="budgetValue">$8,500</output>
+          </div>
+          <input id="budget" class="range" type="range" min="2500" max="25000" step="250" value="8500">
+
+          <div class="design-intelligence-inputs">
+            <div class="field-label">Design intelligence</div>
+            <div class="input-grid intelligence-grid">
+              <label>Users<select id="diUsers"><option value="1">1 person</option><option value="2" selected>2 people</option><option value="3">3 people</option><option value="4+">4+ people</option></select></label>
+              <label>Storage priority<select id="diStorage"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select></label>
+              <label>Bath preference<select id="diBath"><option value="shower" selected>Walk-in shower</option><option value="tub">Bathtub</option><option value="both">Shower + tub</option></select></label>
+              <label>Accessibility<select id="diAccessibility"><option value="standard" selected>Standard</option><option value="step_free">Step-free</option><option value="enhanced">Enhanced clearances</option></select></label>
+              <label>Plumbing flexibility<select id="diPlumbing"><option value="limited" selected>Keep plumbing close</option><option value="flexible">Flexible</option></select></label>
+              <label>Circulation priority<select id="diCirculation"><option value="medium">Balanced</option><option value="high" selected>High</option></select></label>
+            </div>
+          </div>
+
+          <div id="aiBriefPreview" class="ai-brief-preview"><div class="ai-status-row"><strong>✦ Nestora AI brief</strong><span id="aiSetupStatus">Ready from your inputs</span></div><p id="aiBriefPreviewText">High circulation priority · medium storage · walk-in shower · keep plumbing close.</p></div>
+
+          <button id="generateBtn" class="primary-btn wide">✦ Generate with Nestora AI</button>
+          <p class="small-note">The planner generates several candidates, checks clearances, then opens the studio.</p>
+        </section>
+      </div>
+    </section>
+
+    <!-- STUDIO -->
+    <section id="studioView" class="studio-view hidden">
+      <div class="studio-toolbar">
+        <div>
+          <div class="eyebrow">DESIGN STUDIO</div>
+          <h1 id="studioTitle">Modern Cozy</h1>
+          <p id="studioNote">Warm timber, soft lighting and comfortable circulation.</p>
+        </div>
+        <div class="toolbar-actions">
+          <button id="backSetupBtn" class="ghost-btn">← Room setup</button>
+          <button id="exportPdfBtn" class="ghost-btn">PDF ↓</button>
+          <button id="saveBtn" class="primary-btn">Save design</button>
+        </div>
+      </div>
+
+      <div class="studio-shell">
+        <aside class="studio-sidebar">
+          <div class="side-section">
+            <div class="side-label">GENERATED LAYOUTS</div>
+            <div id="layoutChoices" class="layout-choices"></div>
+          </div>
+
+          <div class="side-section">
+            <div class="side-label">ROOM</div>
+            <div class="room-stat"><span>Tile</span><strong id="tileStat">Warm Travertine</strong></div>
+            <div class="room-stat"><span>Footprint</span><strong id="roomStat">10 × 8 ft</strong></div>
+            <div class="room-stat"><span>Budget</span><strong id="budgetStat">$8,500</strong></div>
+            <div class="room-stat"><span>Selected</span><strong id="costStat">$0</strong></div>
+          </div>
+
+          <div class="side-section">
+            <div class="side-label">AI ASSISTANT</div>
+            <div id="assistantBox" class="assistant-box">
+              <div class="assistant-title">✦ Nestora AI Design Intelligence</div><div id="assistantContext" class="assistant-context">Waiting for a generated layout</div>
+              <div id="aiSourceBadge" class="ai-source-badge">Spatial engine</div>
+              <div id="aiBriefText" class="ai-brief-text">Your design brief will appear here.</div>
+              <div id="assistantText" class="assistant-text">Generate a layout to see validated strengths, warnings and AI reasoning.</div>
+              <div class="ai-refine"><div class="ai-section-title">Ask Nestora to revise it</div><div class="ai-refine-row"><input id="aiRefineInput" placeholder="e.g. More storage, but keep plumbing close"><button id="aiRefineBtn" class="mini-btn">Apply + regenerate</button></div><div class="small-note">Your request is converted into planner constraints, then geometry is validated again.</div></div>
+              <button id="suggestBtn" class="mini-btn">Re-analyze design</button>
+            </div>
+          </div>
+
+          <div class="side-section side-grow">
+            <div class="side-label">FIXTURES</div>
+            <div id="fixtureList" class="fixture-list"></div>
+            <button id="addFixtureBtn" class="outline-btn">＋ Add fixture</button>
+          </div>
+        </aside>
+
+        <section class="workspace">
+          <div class="view-toolbar">
+            <div class="view-toggle" id="viewToggle">
+              <button data-view="2d" class="active">2D plan</button>
+              <button data-view="3d">3D room</button>
+            </div>
+            <div class="view-help" id="viewHelp">Drag fixtures to reposition · click to inspect</div>
+            <label class="finish-control">Finish<select id="studioTileSelect">
+              <option value="travertine">Warm Travertine</option>
+              <option value="terrazzo">Cream Terrazzo</option>
+              <option value="sage">Sage Zellige</option>
+              <option value="slate">Charcoal Slate</option>
+              <option value="terracotta">Terracotta</option>
+              <option value="marble">Custom Marble</option>
+            </select></label>
+            <button id="resetViewBtn" class="ghost-btn compact">Reset</button>
+          </div>
+
+          <div id="canvasStage" class="canvas-stage">
+            <div id="planPane" class="view-pane">
+              <svg id="planSvg" role="img" aria-label="Interactive bathroom floor plan"></svg>
+              <div class="plan-legend">
+                <span><i class="legend-fixture"></i> fixture</span>
+                <span><i class="legend-clearance"></i> clearance</span>
+                <span><i class="legend-door"></i> door swing</span><span><i class="legend-keepclear"></i> keep clear</span>
+              </div>
+            </div>
+            <div id="threePane" class="view-pane">
+              <div id="threeContainer"></div>
+              <div class="three-overlay">
+                <strong>Walkthrough mode</strong>
+                <span>Click to enter</span>
+                <span>W A S D · Move</span>
+                <span>Mouse · Look around</span>
+                <span>ESC · Release mouse</span>
+            </div>
+            </div>
+            <div id="loadingOverlay" class="loading-overlay hidden"><div class="spinner"></div><span>Building your bathroom…</span></div>
+          </div>
+
+          <div class="fixture-strip" id="fixtureStrip"></div>
+          <div class="selection-bar">
+            <div>
+              <span class="selection-label">SELECTED</span>
+              <strong id="selectedName">Nothing selected</strong>
+              <span id="selectedMeta" class="muted">Choose a fixture on the plan</span>
+            </div>
+            <div class="selection-actions">
+              <button id="rotateBtn" class="mini-btn">↻ Rotate</button>
+              <button id="deleteBtn" class="mini-btn danger">Delete</button>
+            </div>
+          </div>
+        </section>
+
+        <aside class="inspector">
+          <div class="inspector-heading">
+            <div><div class="side-label">INSPECTOR</div><h2 id="inspectorTitle">Select a fixture</h2></div>
+            <span id="validBadge" class="status-badge neutral">—</span>
+          </div>
+          <div id="inspectorContent" class="inspector-empty">
+            Click a fixture to see dimensions, finish and placement details.
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <!-- CATALOG MODAL -->
+  <div id="catalogModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-card">
+      <div class="modal-head"><div><div class="side-label">PRODUCT CATALOG</div><h2>Choose a fixture</h2></div><button id="closeCatalog" class="icon-btn">×</button></div>
+      <div id="catalogFilters" class="catalog-filters"></div>
+      <div id="catalogGrid" class="catalog-grid"></div>
+    </div>
+  </div>
+
+  <!-- SAVE MODAL -->
+  <div id="saveModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="small-modal-card">
+      <div class="modal-head"><div><div class="side-label">SAVE DESIGN</div><h2>Name your bathroom</h2></div><button id="closeSave" class="icon-btn">×</button></div>
+      <label class="save-input">Design name<input id="designName" value="Warm Retreat"></label>
+      <button id="confirmSave" class="primary-btn wide">Save to studio</button>
+    </div>
+  </div>
+
+
+  <!-- SAVED DESIGNS MODAL -->
+  <div id="savedDesignsModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-card saved-designs-card">
+      <div class="modal-head"><div><div class="side-label">YOUR STUDIO</div><h2>Saved designs</h2></div><button id="closeSavedDesigns" class="icon-btn">×</button></div>
+      <div id="savedDesignsList" class="saved-designs-list"><div class="muted">Loading…</div></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+  <script type="module" src="/static/app.js?v=20260919c"></script>
+</body>
+</html>
