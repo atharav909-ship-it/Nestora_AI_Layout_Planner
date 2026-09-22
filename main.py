@@ -774,7 +774,7 @@ def design_intelligence(req: IntelligenceRequest):
             from google import genai
             client=genai.Client(api_key=api_key)
             prompt="""You are Nestora's bathroom design reasoning layer. Use ONLY the supplied computed facts and user brief. Do not invent measurements, compliance claims, or products. Return JSON with keys: summary (2 sentences), tradeoff (1 sentence), next_action (1 sentence).\n""" + json.dumps({"brief":brief,"facts":facts,"comparison":comparison,"measured_tradeoff":measured_tradeoff,"layout":req.layoutName,"strategy":req.strategy,"products":[{"name":x.get("name"),"category":x.get("category"),"price":x.get("price")} for x in req.bundle]})
-            ai=client.models.generate_content(model="gemini-2.5-flash",contents=prompt)
+            ai=client.models.generate_content(model="gemini-3.6-flash",contents=prompt)
             parsed=json.loads(ai.text.replace("```json","").replace("```","").strip())
             response.update({"source":"gemini+spatial-engine","aiAvailable":True,"summary":parsed.get("summary"),"tradeoff":parsed.get("tradeoff",response["tradeoff"]),"nextAction":parsed.get("next_action")})
         except Exception as exc:
@@ -798,7 +798,7 @@ def refine_design(req: RefineRequest):
             from google import genai
             client=genai.Client(api_key=api_key)
             prompt="""Convert the bathroom redesign request into JSON only. Allowed keys: storage_priority(low|medium|high), circulation_priority(medium|high), plumbing_flexibility(limited|flexible), bath_preference(shower|tub|both), accessibility(standard|step_free|enhanced). Omit anything not requested. Request: """ + req.instruction
-            ai=client.models.generate_content(model="gemini-2.5-flash",contents=prompt)
+            ai=client.models.generate_content(model="gemini-3.6-flash",contents=prompt)
             parsed=json.loads(ai.text.replace("```json","").replace("```","").strip())
             allowed={"storage_priority":{"low","medium","high"},"circulation_priority":{"medium","high"},"plumbing_flexibility":{"limited","flexible"},"bath_preference":{"shower","tub","both"},"accessibility":{"standard","step_free","enhanced"}}
             for k,vals in allowed.items():
@@ -884,7 +884,7 @@ notes: short string.
 Only mark dimensions_reliable true when the image contains a credible scale reference. Otherwise provide a rough estimate but explicitly mark it unreliable.
 """
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-3.6-flash",
                 contents=[
                     types.Part.from_bytes(data=contents, mime_type=file.content_type or "image/jpeg"),
                     prompt,
