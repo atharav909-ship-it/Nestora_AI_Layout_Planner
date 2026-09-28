@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-
+from ai.service import (generate_design_intelligence,interpret_refinement,analyze_image,)
 from database import Base, engine, get_db, migrate_schema
 from models import CatalogItemModel, DesignModel
 from seed import init_db
@@ -768,17 +768,43 @@ def design_intelligence(req: IntelligenceRequest):
         elif tier: reason=f"{name} is the {tier} tier selected by the budget-aware bundle optimizer."
         product_reasoning.append({"product":name,"reason":reason})
     response={"source":"spatial-engine","aiAvailable":False,"brief":brief,"facts":facts,"strengths":strengths,"warnings":warnings,"tradeoff":measured_tradeoff,"comparison":comparison,"productReasoning":product_reasoning}
-    api_key=os.getenv("GEMINI_API_KEY")
-    if api_key:
-        try:
-            from google import genai
-            client=genai.Client(api_key=api_key)
-            prompt="""You are Nestora's bathroom design reasoning layer. Use ONLY the supplied computed facts and user brief. Do not invent measurements, compliance claims, or products. Return JSON with keys: summary (2 sentences), tradeoff (1 sentence), next_action (1 sentence).\n""" + json.dumps({"brief":brief,"facts":facts,"comparison":comparison,"measured_tradeoff":measured_tradeoff,"layout":req.layoutName,"strategy":req.strategy,"products":[{"name":x.get("name"),"category":x.get("category"),"price":x.get("price")} for x in req.bundle]})
-            ai=client.models.generate_content(model="gemini-3.6-flash",contents=prompt)
-            parsed=json.loads(ai.text.replace("```json","").replace("```","").strip())
-            response.update({"source":"gemini+spatial-engine","aiAvailable":True,"summary":parsed.get("summary"),"tradeoff":parsed.get("tradeoff",response["tradeoff"]),"nextAction":parsed.get("next_action")})
-        except Exception as exc:
-            print(f"Gemini design intelligence error: {exc}")
+    try:
+        context = {
+            "brief": brief,
+            "facts": facts,
+            "comparison": comparison,
+            "measured_tradeoff": measured_tradeoff,
+            "layout": req.layoutName,
+            "strategy": req.strategy,
+            "products": [
+                {
+                    "name": x.get("name"),
+                    "category": x.get("category"),
+                    "price": x.get("price")
+                }
+                for x in req.bundle
+            ]
+        }
+
+        parsed = generate_design_intelligence(context)
+
+        if parsed:
+            response.update({
+                "source": "gemini+spatial-engine",
+                "aiAvailable": True,
+                "summary": parsed.get("summary"),
+                "tradeoff": parsed.get(
+                    "tradeoff",
+                    response["tradeoff"]
+                ),
+                "nextAction": parsed.get("next_action")
+            })
+
+    except Exception as exc:
+        print(
+            f"Gemini design intelligence error: {exc}"
+        )
+
     return response
 
 
@@ -792,18 +818,14 @@ def refine_design(req: RefineRequest):
     if "shower" in text and "tub" not in text: di["bath_preference"]="shower"; changes.append("bath preference -> walk-in shower")
     if any(k in text for k in ["accessible","accessibility","wheelchair","step-free","step free"]): di["accessibility"]="enhanced"; changes.append("accessibility -> enhanced")
     # Gemini may interpret subtler wording, but only into this safe structured schema.
-    api_key=os.getenv("GEMINI_API_KEY")
-    if api_key:
-        try:
-            from google import genai
-            client=genai.Client(api_key=api_key)
-            prompt="""Convert the bathroom redesign request into JSON only. Allowed keys: storage_priority(low|medium|high), circulation_priority(medium|high), plumbing_flexibility(limited|flexible), bath_preference(shower|tub|both), accessibility(standard|step_free|enhanced). Omit anything not requested. Request: """ + req.instruction
-            ai=client.models.generate_content(model="gemini-3.6-flash",contents=prompt)
-            parsed=json.loads(ai.text.replace("```json","").replace("```","").strip())
-            allowed={"storage_priority":{"low","medium","high"},"circulation_priority":{"medium","high"},"plumbing_flexibility":{"limited","flexible"},"bath_preference":{"shower","tub","both"},"accessibility":{"standard","step_free","enhanced"}}
-            for k,vals in allowed.items():
-                if parsed.get(k) in vals: di[k]=parsed[k]
-        except Exception as exc: print(f"Gemini refinement error: {exc}")
+    try:
+        parsed = interpret_refinement(req.instruction)
+
+        for key, value in parsed.items():
+            di[key] = value
+
+    except Exception as exc:
+        print(f"Gemini refinement error: {exc}")
     return {"designIntelligence":di,"changes":changes,"message":"I translated your request into planner constraints. Regenerating will re-run geometry validation and product matching."}
 
 
@@ -863,59 +885,39 @@ def suggestions(req: SuggestionRequest):
 
 
 @app.post("/api/analyze-image")
+@app.post("/api/analyze-image")
 async def analyze_room_image(file: UploadFile = File(...)):
     contents = await file.read()
-    api_key = os.getenv("GEMINI_API_KEY")
-    if api_key:
-        try:
-            from google import genai
-            from google.genai import types
-            client = genai.Client(api_key=api_key)
-            prompt = """
-Analyze this bathroom/room image. Return JSON only with:
-length_ft: estimated room length from 6 to 20;
-width_ft: estimated room width from 5 to 16;
-suggested_theme: one of modern_cozy, scandinavian, boho, classic, mediterranean, minimalist, rustic, luxury_spa;
-door_position: bottom_left or bottom_right;
-confidence: number 0 to 1;
-dimensions_reliable: boolean;
-detected_features: array of short strings such as toilet, vanity, shower, tub, window;
-notes: short string.
-Only mark dimensions_reliable true when the image contains a credible scale reference. Otherwise provide a rough estimate but explicitly mark it unreliable.
-"""
-            response = client.models.generate_content(
-                model="gemini-3.6-flash",
-                contents=[
-                    types.Part.from_bytes(data=contents, mime_type=file.content_type or "image/jpeg"),
-                    prompt,
-                ],
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema={
-                        "type": "OBJECT",
-                        "properties": {
-                            "length_ft": {"type": "NUMBER"},
-                            "width_ft": {"type": "NUMBER"},
-                            "suggested_theme": {"type": "STRING"},
-                            "door_position": {"type": "STRING"},
-                            "confidence": {"type": "NUMBER"},
-                            "dimensions_reliable": {"type": "BOOLEAN"},
-                            "detected_features": {"type": "ARRAY", "items": {"type": "STRING"}},
-                            "notes": {"type": "STRING"},
-                        },
-                        "required": ["length_ft", "width_ft", "suggested_theme", "door_position", "confidence", "dimensions_reliable", "detected_features", "notes"],
-                    },
-                ),
-            )
-            result = json.loads(response.text)
+
+    try:
+        result = analyze_image(
+            contents,
+            file.content_type or "image/jpeg"
+        )
+
+        if result:
             result["analysis_available"] = True
             result["source"] = "gemini"
             return result
-        except Exception as exc:
-            print(f"Gemini vision error: {exc}")
-            return {"analysis_available": False, "error": "Vision analysis failed. Review server logs and enter dimensions manually."}
-    return {"analysis_available": False, "error": "Gemini vision is not configured. Set GEMINI_API_KEY or enter dimensions manually."}
 
+    except Exception as exc:
+        print(f"Gemini vision error: {exc}")
+
+        return {
+            "analysis_available": False,
+            "error": (
+                "Vision analysis failed. "
+                "Review server logs and enter dimensions manually."
+            )
+        }
+
+    return {
+        "analysis_available": False,
+        "error": (
+            "Gemini vision is not configured. "
+            "Set GEMINI_API_KEY or enter dimensions manually."
+        )
+    }
 
 @app.post("/api/designs", status_code=status.HTTP_201_CREATED)
 def save_design(req: SaveDesignRequest, db: Session = Depends(get_db)):
