@@ -11,7 +11,7 @@ from ai.prompts import (
 )
 
 from ai.schemas import (
-    REFINEMENT_ALLOWED_VALUES,
+    DesignIntent,
     IMAGE_ANALYSIS_SCHEMA,
 )
 
@@ -81,13 +81,9 @@ def interpret_refinement(instruction):
         .strip()
     )
 
-    validated = {}
+    intent = DesignIntent.model_validate(parsed)
 
-    for key, allowed_values in REFINEMENT_ALLOWED_VALUES.items():
-        if parsed.get(key) in allowed_values:
-            validated[key] = parsed[key]
-
-    return validated
+    return intent.model_dump(exclude_unset=True)
 
 
 # -----------------------------------------

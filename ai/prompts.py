@@ -12,20 +12,94 @@ next_action (1 sentence).
 
 
 REFINEMENT_PROMPT = """
-Convert the bathroom redesign request into JSON only.
+You convert a user's bathroom redesign request into structured design intent.
 
-Allowed keys:
-storage_priority (low|medium|high),
-circulation_priority (medium|high),
-plumbing_flexibility (limited|flexible),
-bath_preference (shower|tub|both),
-accessibility (standard|step_free|enhanced).
+Return JSON only. Do not include markdown or explanations.
 
-Omit anything not requested.
+The JSON may contain:
 
-Request:
+storage_priority:
+- low
+- medium
+- high
+
+circulation_priority:
+- medium
+- high
+
+plumbing_flexibility:
+- limited
+- flexible
+
+bath_preference:
+- shower
+- tub
+- both
+- null
+
+accessibility:
+- standard
+- step_free
+- enhanced
+
+locked_fixtures:
+A list containing any fixtures the user explicitly says should not move.
+Allowed fixtures:
+- shower
+- toilet
+- vanity
+- tub
+
+placement_preferences:
+A list of placement preferences.
+
+Each placement preference has:
+
+fixture:
+- shower
+- toilet
+- vanity
+- tub
+
+preferred_wall:
+- left
+- right
+- top
+- bottom
+- null
+
+preferred_zone:
+- front
+- rear
+- center
+- null
+
+avoid_entrance:
+- true
+- false
+
+Rules:
+
+1. Do not invent preferences that the user did not request.
+
+2. If the user says a fixture should stay where it is,
+   add that fixture to locked_fixtures.
+
+3. If the user says "if possible", "prefer", "ideally",
+   or similar wording, treat it as a placement preference,
+   not a hard lock.
+
+4. If the user wants a fixture away from the entrance,
+   set avoid_entrance to true.
+
+5. If no wall or zone was requested, use null.
+
+6. Use only the allowed values listed above.
+
+7. Do not generate coordinates, measurements, or geometry.
+
+User request:
 """
-
 
 IMAGE_ANALYSIS_PROMPT = """
 Analyze this bathroom/room image.

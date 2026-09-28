@@ -885,7 +885,6 @@ def suggestions(req: SuggestionRequest):
 
 
 @app.post("/api/analyze-image")
-@app.post("/api/analyze-image")
 async def analyze_room_image(file: UploadFile = File(...)):
     contents = await file.read()
 
