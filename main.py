@@ -820,7 +820,7 @@ def refine_design(req: RefineRequest):
     # Gemini may interpret subtler wording, but only into this safe structured schema.
     try:
         parsed = interpret_refinement(req.instruction)
-
+        print("PHASE 2 PARSED DESIGN INTENT:", parsed)
         for key, value in parsed.items():
             di[key] = value
 
