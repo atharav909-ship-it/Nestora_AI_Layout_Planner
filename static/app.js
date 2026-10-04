@@ -726,14 +726,29 @@ function startDrag(event, entry) {
 
 function switchView(view) {
   state.currentView = view;
-  document.querySelectorAll('#viewToggle button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
-  // Reference UI keeps plan + walkthrough visible together. Buttons select interaction focus.
-  $('planPane').classList.remove('hidden');
-  $('threePane').classList.remove('hidden');
-  $('planPane').classList.toggle('focus-pane', view === '2d');
-  $('threePane').classList.toggle('focus-pane', view === '3d');
-  $('viewHelp').textContent = view === '2d' ? 'Drag fixtures to reposition · click to inspect' : 'Click inside 3D · WASD to move · mouse to look around';
-  requestAnimationFrame(() => { init3D(); resizeThree(); render3D(); });
+
+  document.querySelectorAll('#viewToggle button').forEach(b =>
+    b.classList.toggle('active', b.dataset.view === view)
+  );
+
+  const show2D = view === '2d';
+
+  $('planPane').classList.toggle('hidden', !show2D);
+  $('threePane').classList.toggle('hidden', show2D);
+
+  $('viewHelp').textContent = show2D
+    ? 'Drag fixtures to reposition · click to inspect'
+    : 'Click inside 3D · WASD to move · mouse to look around';
+
+  if (show2D) {
+    requestAnimationFrame(() => render2D());
+  } else {
+    requestAnimationFrame(() => {
+      init3D();
+      resizeThree();
+      render3D();
+    });
+  }
 }
 
 function resetView() {
@@ -2176,4 +2191,7 @@ function nestoraStartNewDesign(){ $('nestoraDashboard')?.classList.add('hidden')
 function nestoraShowDashboard(){ if(!nestoraAuthUser)return; $('authGate')?.classList.add('hidden'); $('nestoraDashboard')?.classList.remove('hidden'); $('dashboardUserName').textContent=nestoraAuthUser.name||'Designer'; $('dashboardUserEmail').textContent=nestoraAuthUser.email||''; nestoraLoadDashboardDesigns(); }
 async function nestoraLoadDashboardDesigns(){ const g=$('dashboardDesignGrid'),e=$('dashboardEmpty'); g.innerHTML='Loading…';e.classList.add('hidden'); try{const r=await fetch('/api/designs');if(!r.ok)throw new Error();const ds=await r.json();if(!ds.length){g.innerHTML='';e.classList.remove('hidden');return;}g.innerHTML=ds.map(d=>`<article class="dash-card"><div class="dash-preview"><span>${String(d.theme||'').replaceAll('_',' ')}</span><strong>${Number(d.roomLengthFt||0).toFixed(0)} × ${Number(d.roomWidthFt||0).toFixed(0)} ft</strong></div><div class="dash-body"><h3>${d.name||'Untitled bathroom'}</h3><p>${d.bundle?.length||0} products · ${formatUSD(d.totalCost||0)}</p><div class="dash-actions"><button data-open="${d.id}">Open</button><button data-rename="${d.id}">Rename</button><button data-delete="${d.id}">Delete</button></div></div></article>`).join('');g.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{const d=ds.find(x=>String(x.id)===b.dataset.open);$('nestoraDashboard').classList.add('hidden');openSavedDesign(d)});g.querySelectorAll('[data-rename]').forEach(b=>b.onclick=async()=>{const d=ds.find(x=>String(x.id)===b.dataset.rename),n=prompt('Rename design',d.name);if(!n?.trim())return;await fetch(`/api/designs/${d.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n.trim()})});nestoraLoadDashboardDesigns()});g.querySelectorAll('[data-delete]').forEach(b=>b.onclick=async()=>{const d=ds.find(x=>String(x.id)===b.dataset.delete);if(confirm(`Delete “${d.name}”?`)){await fetch(`/api/designs/${d.id}`,{method:'DELETE'});nestoraLoadDashboardDesigns()}})}catch{g.innerHTML='Could not load your saved designs.'}}
 $('dashboardNewDesignBtn')?.addEventListener('click',nestoraStartNewDesign);$('dashboardEmptyNewBtn')?.addEventListener('click',nestoraStartNewDesign);$('dashboardRefreshBtn')?.addEventListener('click',nestoraLoadDashboardDesigns);$('dashboardLogoutBtn')?.addEventListener('click',async()=>{await fetch('/api/auth/logout',{method:'POST'});nestoraLockStudio()});
+// Phase 4: navigation only. Existing planner behavior is unchanged.
+$('dashboardBtn')?.addEventListener('click',()=>{$('studioView')?.classList.add('hidden');nestoraShowDashboard();});
+document.querySelectorAll('[data-studio-target]').forEach(button=>button.addEventListener('click',()=>document.querySelector(`[data-studio-section="${button.dataset.studioTarget}"]`)?.scrollIntoView({behavior:'smooth',block:'nearest'})));
 

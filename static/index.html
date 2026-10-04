@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="/static/style.css?v=20260918d">
   <link rel="stylesheet" href="/static/auth.css?v=20261004a">
   <link rel="stylesheet" href="/static/dashboard.css?v=20261004b">
+  <link rel="stylesheet" href="/static/studio-v2.css?v=20261004a">
 
 <script type="importmap">
 {
@@ -213,7 +214,8 @@
           <p id="studioNote">Warm timber, soft lighting and comfortable circulation.</p>
         </div>
         <div class="toolbar-actions">
-          <button id="backSetupBtn" class="ghost-btn">← Room setup</button>
+          <button id="dashboardBtn" class="ghost-btn">← Dashboard</button>
+          <button id="backSetupBtn" class="ghost-btn">Room setup</button>
           <button id="exportPdfBtn" class="ghost-btn">PDF ↓</button>
           <button id="saveBtn" class="primary-btn">Save design</button>
         </div>
@@ -221,12 +223,18 @@
 
       <div class="studio-shell">
         <aside class="studio-sidebar">
-          <div class="side-section">
+          <nav class="studio-section-nav" aria-label="Design tools">
+            <button type="button" data-studio-target="layouts">Layouts</button>
+            <button type="button" data-studio-target="room">Room</button>
+            <button type="button" data-studio-target="ai">Nestora AI</button>
+            <button type="button" data-studio-target="fixtures">Fixtures</button>
+          </nav>
+          <div class="side-section" data-studio-section="layouts">
             <div class="side-label">GENERATED LAYOUTS</div>
             <div id="layoutChoices" class="layout-choices"></div>
           </div>
 
-          <div class="side-section">
+          <div class="side-section" data-studio-section="room">
             <div class="side-label">ROOM</div>
             <div class="room-stat"><span>Tile</span><strong id="tileStat">Warm Travertine</strong></div>
             <div class="room-stat"><span>Footprint</span><strong id="roomStat">10 × 8 ft</strong></div>
@@ -234,8 +242,8 @@
             <div class="room-stat"><span>Selected</span><strong id="costStat">$0</strong></div>
           </div>
 
-          <div class="side-section">
-            <div class="side-label">AI ASSISTANT</div>
+          <div class="side-section" data-studio-section="ai">
+            <div class="side-label">NESTORA AI</div>
             <div id="assistantBox" class="assistant-box">
               <div class="assistant-title">✦ Nestora AI Design Intelligence</div><div id="assistantContext" class="assistant-context">Waiting for a generated layout</div>
               <div id="aiSourceBadge" class="ai-source-badge">Spatial engine</div>
@@ -246,7 +254,7 @@
             </div>
           </div>
 
-          <div class="side-section side-grow">
+          <div class="side-section side-grow" data-studio-section="fixtures">
             <div class="side-label">FIXTURES</div>
             <div id="fixtureList" class="fixture-list"></div>
             <button id="addFixtureBtn" class="outline-btn">＋ Add fixture</button>
@@ -309,11 +317,11 @@
 
         <aside class="inspector">
           <div class="inspector-heading">
-            <div><div class="side-label">INSPECTOR</div><h2 id="inspectorTitle">Select a fixture</h2></div>
+            <div><div class="side-label">DESIGN DETAILS</div><h2 id="inspectorTitle">Select a fixture</h2></div>
             <span id="validBadge" class="status-badge neutral">—</span>
           </div>
           <div id="inspectorContent" class="inspector-empty">
-            Click a fixture to see dimensions, finish and placement details.
+            Select a fixture to review its dimensions, finish, placement and validation.
           </div>
         </aside>
       </div>
