@@ -214,6 +214,10 @@
           <p id="studioNote">Warm timber, soft lighting and comfortable circulation.</p>
         </div>
         <div class="toolbar-actions">
+          <div class="studio-mode-toggle" aria-label="Workspace mode">
+            <button id="studioModeBtn" class="active" type="button">Design Studio</button>
+            <button id="intelligenceModeBtn" type="button">Design Intelligence</button>
+          </div>
           <button id="dashboardBtn" class="ghost-btn">← Dashboard</button>
           <button id="backSetupBtn" class="ghost-btn">Room setup</button>
           <button id="exportPdfBtn" class="ghost-btn">PDF ↓</button>
@@ -221,7 +225,7 @@
         </div>
       </div>
 
-      <div class="studio-shell">
+      <div id="studioShell" class="studio-shell">
         <aside class="studio-sidebar">
           <nav class="studio-section-nav" aria-label="Design tools">
             <button type="button" data-studio-target="layouts">Layouts</button>
@@ -325,6 +329,71 @@
           </div>
         </aside>
       </div>
+
+      <section id="intelligenceWorkspace" class="intelligence-workspace hidden" aria-label="Nestora Design Intelligence">
+        <div class="intel-hero">
+          <div>
+            <div class="eyebrow">NESTORA DESIGN INTELLIGENCE</div>
+            <h2>Understand the decisions behind your bathroom</h2>
+            <p id="intelHeroBrief">Generate a layout to inspect design intent, verified spatial facts and AI recommendations.</p>
+          </div>
+          <div class="intel-hero-actions">
+            <span id="intelSourceBadge" class="ai-source-badge">Spatial engine</span>
+            <button id="intelRefreshBtn" class="primary-btn" type="button">Re-analyze design</button>
+          </div>
+        </div>
+
+        <div class="intel-grid">
+          <article class="intel-panel">
+            <div class="intel-panel-head"><span>01</span><h3>Design intent</h3></div>
+            <div id="intelIntent" class="intel-kv"></div>
+          </article>
+
+          <article class="intel-panel">
+            <div class="intel-panel-head"><span>02</span><h3>Layout health</h3></div>
+            <div id="intelHealth" class="intel-health">
+              <div class="intel-empty">Run the analysis to see verified strengths and warnings.</div>
+            </div>
+          </article>
+
+          <article class="intel-panel">
+            <div class="intel-panel-head"><span>03</span><h3>Fixture intent</h3></div>
+            <div id="intelFixtureIntent" class="intel-fixture-intent"></div>
+          </article>
+
+          <article class="intel-panel intel-assessment">
+            <div class="intel-panel-head"><span>04</span><h3>AI assessment</h3></div>
+            <div id="intelAssessment" class="intel-copy">No assessment yet.</div>
+            <div class="intel-subsection"><strong>Measured trade-off</strong><p id="intelTradeoff">—</p></div>
+            <div class="intel-subsection"><strong>Suggested next action</strong><p id="intelNextAction">—</p></div>
+          </article>
+
+          <article class="intel-panel intel-wide">
+            <div class="intel-panel-head"><span>05</span><h3>Compare generated layouts</h3></div>
+            <div id="intelComparisons" class="intel-comparisons">
+              <div class="intel-empty">Generate layout alternatives to compare them here.</div>
+            </div>
+          </article>
+
+          <article class="intel-panel intel-wide">
+            <div class="intel-panel-head"><span>06</span><h3>Product reasoning</h3></div>
+            <div id="intelProducts" class="intel-products">
+              <div class="intel-empty">Product reasoning will appear after analysis.</div>
+            </div>
+          </article>
+        </div>
+
+        <div class="intel-command">
+          <div>
+            <strong>✦ Ask Nestora to revise this design</strong>
+            <span>Natural language is converted into structured design intent before the plan is regenerated.</span>
+          </div>
+          <div class="intel-command-row">
+            <input id="intelRefineInput" type="text" placeholder="e.g. Keep the shower, move the toilet away from the entrance, prefer the vanity on the left">
+            <button id="intelRefineBtn" class="primary-btn" type="button">Apply + regenerate</button>
+          </div>
+        </div>
+      </section>
     </section>
   </main>
 

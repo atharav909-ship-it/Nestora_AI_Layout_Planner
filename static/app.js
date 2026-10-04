@@ -726,13 +726,9 @@ function startDrag(event, entry) {
 
 function switchView(view) {
   state.currentView = view;
-
-  document.querySelectorAll('#viewToggle button').forEach(b =>
-    b.classList.toggle('active', b.dataset.view === view)
-  );
+  document.querySelectorAll('#viewToggle button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
 
   const show2D = view === '2d';
-
   $('planPane').classList.toggle('hidden', !show2D);
   $('threePane').classList.toggle('hidden', show2D);
 
@@ -1686,6 +1682,7 @@ async function requestSuggestions() {
     });
     if(!res.ok) throw new Error(await res.text());
     const data=await res.json(); state.currentIntelligence=data;
+    renderIntelligenceWorkspace(data);
     if($('aiSourceBadge')) $('aiSourceBadge').textContent=data.aiAvailable?'Gemini + verified spatial facts':'Verified spatial engine · Gemini not connected';
     if($('aiBriefText')) $('aiBriefText').textContent=data.brief||'';
     if($('assistantContext')) $('assistantContext').textContent=`${active.name||'Layout'} · ${data.facts?.floorOccupancyPercent??'—'}% core footprint`;
@@ -2195,3 +2192,120 @@ $('dashboardNewDesignBtn')?.addEventListener('click',nestoraStartNewDesign);$('d
 $('dashboardBtn')?.addEventListener('click',()=>{$('studioView')?.classList.add('hidden');nestoraShowDashboard();});
 document.querySelectorAll('[data-studio-target]').forEach(button=>button.addEventListener('click',()=>document.querySelector(`[data-studio-section="${button.dataset.studioTarget}"]`)?.scrollIntoView({behavior:'smooth',block:'nearest'})));
 
+
+
+// Phase 5 — Design Intelligence workspace.
+// This exposes structured intent + verified design facts. It does not expose
+// hidden model chain-of-thought and does not change spatial scoring.
+function intelLabel(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  return String(value).replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function renderIntelligenceWorkspace(data = state.currentIntelligence || {}) {
+  const di = state.designIntelligence || state.plan?.designIntelligence || {};
+  const intentRows = [
+    ['Storage priority', di.storage_priority],
+    ['Circulation priority', di.circulation_priority],
+    ['Bath preference', di.bath_preference],
+    ['Accessibility', di.accessibility],
+    ['Plumbing flexibility', di.plumbing_flexibility]
+  ];
+  if ($('intelIntent')) {
+    $('intelIntent').innerHTML = intentRows.map(([k,v]) =>
+      `<div><span>${escapeHtml(k)}</span><strong>${escapeHtml(intelLabel(v))}</strong></div>`
+    ).join('');
+  }
+
+  const locked = Array.isArray(di.locked_fixtures) ? di.locked_fixtures : [];
+  const prefs = Array.isArray(di.placement_preferences) ? di.placement_preferences : [];
+  const fixtureItems = [];
+  locked.forEach(f => fixtureItems.push(
+    `<div class="intel-fixture-row"><b>🔒 ${escapeHtml(intelLabel(f))}</b><span>Keep current position</span></div>`
+  ));
+  prefs.forEach(p => {
+    const details = [];
+    if (p.preferred_wall) details.push(`Prefer ${intelLabel(p.preferred_wall)} wall`);
+    if (p.preferred_zone) details.push(`Prefer ${intelLabel(p.preferred_zone)} zone`);
+    if (p.avoid_entrance) details.push('Avoid entrance');
+    fixtureItems.push(
+      `<div class="intel-fixture-row"><b>${escapeHtml(intelLabel(p.fixture || 'Fixture'))}</b><span>${escapeHtml(details.join(' · ') || 'Placement preference')}</span></div>`
+    );
+  });
+  if ($('intelFixtureIntent')) {
+    $('intelFixtureIntent').innerHTML = fixtureItems.join('') ||
+      '<div class="intel-empty">No fixture-specific preferences have been requested.</div>';
+  }
+
+  const strengths = Array.isArray(data.strengths) ? data.strengths : [];
+  const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+  if ($('intelHealth')) {
+    $('intelHealth').innerHTML =
+      strengths.map(x => `<div class="intel-health-row good"><b>✓</b><span>${escapeHtml(x)}</span></div>`).join('') +
+      warnings.map(x => `<div class="intel-health-row warn"><b>!</b><span>${escapeHtml(x)}</span></div>`).join('') ||
+      '<div class="intel-empty">Run the analysis to see verified strengths and warnings.</div>';
+  }
+
+  if ($('intelAssessment')) $('intelAssessment').textContent = data.summary || 'No AI assessment yet.';
+  if ($('intelTradeoff')) $('intelTradeoff').textContent = data.tradeoff || '—';
+  if ($('intelNextAction')) $('intelNextAction').textContent = data.nextAction || '—';
+  if ($('intelHeroBrief')) $('intelHeroBrief').textContent = data.brief || 'Review structured intent, spatial facts and recommendations for the active layout.';
+  if ($('intelSourceBadge')) $('intelSourceBadge').textContent =
+    data.aiAvailable ? 'Gemini + verified spatial facts' : 'Verified spatial engine · Gemini not connected';
+
+  const active = state.plan?.designs?.[state.activeDesignIndex] || {};
+  const comparisons = Array.isArray(data.comparison) ? data.comparison : [];
+  if ($('intelComparisons')) {
+    $('intelComparisons').innerHTML = comparisons.map(x =>
+      `<div class="intel-compare-card ${x.name === (active.name || '') ? 'active' : ''}">
+        <strong>${escapeHtml(x.name || 'Layout')}</strong>
+        <span>${x.closestGapInches ?? '—'}" closest gap</span>
+        <span>${x.floorOccupancyPercent ?? '—'}% core footprint</span>
+      </div>`
+    ).join('') || '<div class="intel-empty">No comparison data available.</div>';
+  }
+
+  const products = Array.isArray(data.productReasoning) ? data.productReasoning : [];
+  if ($('intelProducts')) {
+    $('intelProducts').innerHTML = products.map(x =>
+      `<div class="intel-product-row"><strong>${escapeHtml(x.product || 'Product')}</strong><span>${escapeHtml(x.reason || '')}</span></div>`
+    ).join('') || '<div class="intel-empty">No product reasoning available.</div>';
+  }
+}
+
+function setStudioMode(mode) {
+  const intelligence = mode === 'intelligence';
+  $('studioShell')?.classList.toggle('hidden', intelligence);
+  $('intelligenceWorkspace')?.classList.toggle('hidden', !intelligence);
+  $('studioModeBtn')?.classList.toggle('active', !intelligence);
+  $('intelligenceModeBtn')?.classList.toggle('active', intelligence);
+
+  if (intelligence) {
+    renderIntelligenceWorkspace();
+    if (state.plan && !state.currentIntelligence) requestSuggestions();
+  } else if (state.currentView === '3d') {
+    requestAnimationFrame(() => { resizeThree(); render3D(); });
+  } else {
+    requestAnimationFrame(() => render2D());
+  }
+}
+
+async function refineFromIntelligenceWorkspace() {
+  const source = $('intelRefineInput');
+  const instruction = source?.value.trim();
+  if (!instruction || !state.plan) return;
+  const legacy = $('aiRefineInput');
+  if (legacy) legacy.value = instruction;
+  await refineWithAI();
+  if (source) source.value = '';
+  if (state.plan) await requestSuggestions();
+  renderIntelligenceWorkspace();
+}
+
+$('studioModeBtn')?.addEventListener('click', () => setStudioMode('studio'));
+$('intelligenceModeBtn')?.addEventListener('click', () => setStudioMode('intelligence'));
+$('intelRefreshBtn')?.addEventListener('click', requestSuggestions);
+$('intelRefineBtn')?.addEventListener('click', refineFromIntelligenceWorkspace);
+$('intelRefineInput')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') refineFromIntelligenceWorkspace();
+});
