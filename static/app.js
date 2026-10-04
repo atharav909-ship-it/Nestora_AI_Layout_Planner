@@ -24,7 +24,7 @@ const state = {
   marbleDesign: 'calacatta',
   tileColor: '#e7dfd2',
   imageAnalysis: {},
-  designIntelligence: {users:'2',storage_priority:'medium',bath_preference:'shower',accessibility:'standard',plumbing_flexibility:'limited',circulation_priority:'high'},
+  designIntelligence: {storage_priority:'medium',bath_preference:'shower',accessibility:'standard',plumbing_flexibility:'limited',circulation_priority:'high'},
 };
 
 let scene;
@@ -251,13 +251,12 @@ function applyTile(tileId) {
 
 function updateAIBriefPreview() {
   const el=$('aiBriefPreviewText'); if(!el) return;
-  const users=$('diUsers')?.value||state.designIntelligence.users;
   const storage=$('diStorage')?.value||state.designIntelligence.storage_priority;
   const bath={shower:'walk-in shower',tub:'bathtub',both:'shower + tub'}[$('diBath')?.value]||'walk-in shower';
   const access={standard:'standard access',step_free:'step-free access',enhanced:'enhanced clearances'}[$('diAccessibility')?.value]||'standard access';
   const plumbing=$('diPlumbing')?.value==='flexible'?'plumbing can move':'keep plumbing close';
   const circulation=$('diCirculation')?.value==='high'?'prioritize open circulation':'balanced circulation';
-  el.textContent=`${users} user(s) · ${storage} storage · ${bath} · ${access} · ${plumbing} · ${circulation}.`;
+  el.textContent=`${storage} storage · ${bath} · ${access} · ${plumbing} · ${circulation}.`;
 }
 
 function setupInputs() {
@@ -273,7 +272,7 @@ function setupInputs() {
     state.door = btn.dataset.door;
   }));
 
-  ['diUsers','diStorage','diBath','diAccessibility','diPlumbing','diCirculation'].forEach(id => $(id)?.addEventListener('change', updateAIBriefPreview));
+  ['diStorage','diBath','diAccessibility','diPlumbing','diCirculation'].forEach(id => $(id)?.addEventListener('change', updateAIBriefPreview));
   updateAIBriefPreview();
 
   $('roomPhoto').addEventListener('change', async e => {
@@ -321,7 +320,7 @@ async function generatePlan() {
   state.roomWidthFt = Number($('roomWidth').value) || 8;
   state.budget = Number($('budget').value) || 8500;
   state.designIntelligence = {
-    users: $('diUsers').value, storage_priority: $('diStorage').value,
+    storage_priority: $('diStorage').value,
     bath_preference: $('diBath').value, accessibility: $('diAccessibility').value,
     plumbing_flexibility: $('diPlumbing').value, circulation_priority: $('diCirculation').value
   };
@@ -1690,7 +1689,7 @@ async function refineWithAI(){
   const input=$('aiRefineInput'); const instruction=input?.value.trim(); if(!instruction||!state.plan) return;
   const btn=$('aiRefineBtn'); if(btn) btn.disabled=true;
   try{ const res=await fetch('/api/designs/refine',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({instruction,designIntelligence:state.designIntelligence})}); if(!res.ok) throw new Error(await res.text()); const data=await res.json(); state.designIntelligence={...state.designIntelligence,...data.designIntelligence};
-    const map={diUsers:'users',diStorage:'storage_priority',diBath:'bath_preference',diAccessibility:'accessibility',diPlumbing:'plumbing_flexibility',diCirculation:'circulation_priority'}; Object.entries(map).forEach(([id,k])=>{if($(id)&&state.designIntelligence[k]!=null)$(id).value=state.designIntelligence[k]});
+    const map={diStorage:'storage_priority',diBath:'bath_preference',diAccessibility:'accessibility',diPlumbing:'plumbing_flexibility',diCirculation:'circulation_priority'}; Object.entries(map).forEach(([id,k])=>{if($(id)&&state.designIntelligence[k]!=null)$(id).value=state.designIntelligence[k]});
     if(input) input.value=''; toast(data.message||'Design request applied.','success'); await generatePlan();
   }catch(e){console.error(e);toast('Nestora could not apply that refinement.','error');}finally{if(btn)btn.disabled=false;}
 }

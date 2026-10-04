@@ -736,12 +736,12 @@ def _comparison(req: IntelligenceRequest, facts):
 
 def _design_brief(req: IntelligenceRequest):
     di=req.designIntelligence or {}
-    users=di.get("users","2"); storage=di.get("storage_priority","medium")
+    storage=di.get("storage_priority","medium")
     bath={"shower":"walk-in shower","tub":"bathtub","both":"shower and bathtub"}.get(di.get("bath_preference"),"shower")
     access={"standard":"standard access","step_free":"step-free access","enhanced":"enhanced clearances"}.get(di.get("accessibility"),"standard access")
     plumbing="retain existing plumbing where practical" if di.get("plumbing_flexibility") == "limited" else "allow plumbing relocation when it improves the plan"
     circulation="prioritize open circulation" if di.get("circulation_priority") == "high" else "balance circulation with fixture capacity"
-    return f"Design for {users} user(s) with {storage} storage priority and a preference for a {bath}. {access.capitalize()}; {plumbing}; {circulation}. Keep the product bundle within ${req.budget:,.0f}."
+    return f"Design with {storage} storage priority and a preference for a {bath}. {access.capitalize()}; {plumbing}; {circulation}. Keep the product bundle within ${req.budget:,.0f}."
 
 
 @app.post("/api/designs/intelligence")
@@ -820,7 +820,6 @@ def refine_design(req: RefineRequest):
     # Gemini may interpret subtler wording, but only into this safe structured schema.
     try:
         parsed = interpret_refinement(req.instruction)
-        print("PHASE 2 PARSED DESIGN INTENT:", parsed)
         for key, value in parsed.items():
             di[key] = value
 
