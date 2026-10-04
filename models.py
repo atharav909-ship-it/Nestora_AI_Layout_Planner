@@ -92,6 +92,7 @@ class DesignModel(Base):
     __tablename__ = "saved_designs"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     name = Column(String, nullable=False)
     theme = Column(String, nullable=False)
     tile = Column(String, default="travertine")
@@ -131,6 +132,7 @@ class DesignModel(Base):
     def to_dict(self):
         return {
             "id": self.id,
+            "userId": self.user_id,
             "name": self.name,
             "theme": self.theme,
             "tile": self.tile,

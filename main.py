@@ -17,7 +17,7 @@ from models import CatalogItemModel, DesignModel, UserModel
 from seed import init_db
 from auth import (
     SESSION_COOKIE, clear_session, create_session, current_user_optional,
-    get_user_from_token, hash_password, verify_password,
+    get_user_from_token, hash_password, verify_password, require_user,
 )
 
 migrate_schema()
@@ -998,55 +998,45 @@ async def analyze_room_image(file: UploadFile = File(...)):
     }
 
 @app.post("/api/designs", status_code=status.HTTP_201_CREATED)
-def save_design(req: SaveDesignRequest, db: Session = Depends(get_db)):
+def save_design(req: SaveDesignRequest, db: Session = Depends(get_db), user=Depends(require_user)):
     design = DesignModel(
-        name=req.name,
-        theme=req.theme,
-        tile=req.tile,
-        marble_design=req.marbleDesign,
-        tile_color=req.tileColor,
-        room_length_ft=req.roomLengthFt,
-        room_width_ft=req.roomWidthFt,
-        budget=req.budget,
-        total_cost=req.totalCost,
-        door_position=req.doorPosition,
-        layout_data=json.dumps(req.layout),
-        bundle_data=json.dumps(req.bundle),
+        user_id=user.id, name=req.name, theme=req.theme, tile=req.tile,
+        marble_design=req.marbleDesign, tile_color=req.tileColor,
+        room_length_ft=req.roomLengthFt, room_width_ft=req.roomWidthFt,
+        budget=req.budget, total_cost=req.totalCost, door_position=req.doorPosition,
+        layout_data=json.dumps(req.layout), bundle_data=json.dumps(req.bundle),
         design_intelligence_data=json.dumps(req.designIntelligence or {}),
         image_analysis_data=json.dumps(req.imageAnalysis or {}),
         layout_analysis_data=json.dumps(req.layoutAnalysis or {}),
     )
-    db.add(design)
-    db.commit()
-    db.refresh(design)
+    db.add(design); db.commit(); db.refresh(design)
     return design.to_dict()
-
 
 @app.get("/api/designs")
-def get_saved_designs(db: Session = Depends(get_db)):
-    return [d.to_dict() for d in db.query(DesignModel).order_by(DesignModel.created_at.desc()).all()]
+def get_saved_designs(db: Session = Depends(get_db), user=Depends(require_user)):
+    designs = db.query(DesignModel).filter(DesignModel.user_id == user.id).order_by(
+        DesignModel.updated_at.desc(), DesignModel.created_at.desc()).all()
+    return [d.to_dict() for d in designs]
 
+def _owned_design_or_404(db: Session, design_id: int, user_id: int):
+    design = db.query(DesignModel).filter(
+        DesignModel.id == design_id, DesignModel.user_id == user_id).first()
+    if not design: raise HTTPException(status_code=404, detail="Design not found")
+    return design
 
 @app.get("/api/designs/{design_id}")
-def get_saved_design(design_id: int, db: Session = Depends(get_db)):
-    design = db.query(DesignModel).filter(DesignModel.id == design_id).first()
-    if not design:
-        raise HTTPException(404, "Design not found")
-    return design.to_dict()
-
+def get_saved_design(design_id: int, db: Session = Depends(get_db), user=Depends(require_user)):
+    return _owned_design_or_404(db, design_id, user.id).to_dict()
 
 @app.patch("/api/designs/{design_id}")
-def rename_saved_design(design_id: int, req: RenameDesignRequest, db: Session = Depends(get_db)):
-    design=db.query(DesignModel).filter(DesignModel.id==design_id).first()
-    if not design: raise HTTPException(404,"Design not found")
-    design.name=req.name.strip(); db.commit(); db.refresh(design); return design.to_dict()
-
+def rename_saved_design(design_id: int, req: RenameDesignRequest, db: Session = Depends(get_db), user=Depends(require_user)):
+    design=_owned_design_or_404(db,design_id,user.id); design.name=req.name.strip()
+    db.commit(); db.refresh(design); return design.to_dict()
 
 @app.delete("/api/designs/{design_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_saved_design(design_id: int, db: Session = Depends(get_db)):
-    design=db.query(DesignModel).filter(DesignModel.id==design_id).first()
-    if not design: raise HTTPException(404,"Design not found")
-    db.delete(design); db.commit(); return None
+def delete_saved_design(design_id: int, db: Session = Depends(get_db), user=Depends(require_user)):
+    design=_owned_design_or_404(db,design_id,user.id); db.delete(design); db.commit()
+    return None
 
 
 if STATIC_DIR.exists():

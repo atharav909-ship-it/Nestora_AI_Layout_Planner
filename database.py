@@ -24,6 +24,8 @@ def migrate_schema():
 
         saved_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(saved_designs)"))}
         if saved_cols:
+            if "user_id" not in saved_cols:
+                conn.execute(text("ALTER TABLE saved_designs ADD COLUMN user_id INTEGER"))
             for col in ("design_intelligence_data", "image_analysis_data", "layout_analysis_data"):
                 if col not in saved_cols:
                     conn.execute(text(f"ALTER TABLE saved_designs ADD COLUMN {col} TEXT NOT NULL DEFAULT '{{}}'"))

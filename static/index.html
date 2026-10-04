@@ -13,6 +13,7 @@
   </script>
   <link rel="stylesheet" href="/static/style.css?v=20260918d">
   <link rel="stylesheet" href="/static/auth.css?v=20261004a">
+  <link rel="stylesheet" href="/static/dashboard.css?v=20261004b">
 
 <script type="importmap">
 {
@@ -94,6 +95,20 @@
   </section>
 
   <div id="toast" class="toast"></div>
+
+  <section id="nestoraDashboard" class="nestora-dashboard hidden">
+    <header class="dash-head"><div><b>NESTORA</b><small>AI Bathroom Studio</small></div>
+      <div><span id="dashboardUserEmail"></span><button id="dashboardLogoutBtn">Sign out</button></div></header>
+    <main class="dash-main"><section class="dash-welcome"><div><small>YOUR DESIGN WORKSPACE</small>
+      <h1>Welcome, <span id="dashboardUserName">Designer</span>.</h1>
+      <p>Start a new bathroom or continue one of your saved designs.</p></div>
+      <button id="dashboardNewDesignBtn" class="dash-primary">＋ New bathroom</button></section>
+      <section class="dash-section"><div class="dash-title"><div><small>SAVED DESIGNS</small><h2>Your bathrooms</h2></div>
+      <button id="dashboardRefreshBtn">Refresh</button></div>
+      <div id="dashboardEmpty" class="dash-empty hidden"><h3>No saved bathrooms yet</h3>
+      <p>Create your first design and save it to keep it in your account.</p>
+      <button id="dashboardEmptyNewBtn" class="dash-primary">Create first design</button></div>
+      <div id="dashboardDesignGrid" class="dash-grid"></div></section></main></section>
 
   <header class="topbar">
     <div class="brand-wrap">
