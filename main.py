@@ -5,16 +5,20 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, status
+from fastapi import Cookie, Depends, FastAPI, File, HTTPException, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from ai.service import (generate_design_intelligence,interpret_refinement,analyze_image,)
-from database import Base, engine, get_db, migrate_schema
-from models import CatalogItemModel, DesignModel
+from database import Base, SessionLocal, engine, get_db, migrate_schema
+from models import CatalogItemModel, DesignModel, UserModel
 from seed import init_db
+from auth import (
+    SESSION_COOKIE, clear_session, create_session, current_user_optional,
+    get_user_from_token, hash_password, verify_password,
+)
 
 migrate_schema()
 init_db()
@@ -147,6 +151,17 @@ class IntelligenceRequest(BaseModel):
 class RefineRequest(BaseModel):
     instruction: str = Field(..., min_length=2, max_length=500)
     designIntelligence: Dict[str, Any] = Field(default_factory=dict)
+
+
+class RegisterRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=80)
+    email: str = Field(..., min_length=5, max_length=255)
+    password: str = Field(..., min_length=8, max_length=128)
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(..., min_length=5, max_length=255)
+    password: str = Field(..., min_length=1, max_length=128)
 
 
 class RenameDesignRequest(BaseModel):
@@ -565,6 +580,71 @@ def choose_bundle(db: Session, theme: str, budget: float, intelligence: Optional
 
 
 # ------------------------------ API ------------------------------
+
+@app.middleware("http")
+async def require_login_for_design_api(request: Request, call_next):
+    path = request.url.path
+    public_api = (
+        path == "/api/health"
+        or path == "/api/catalog"
+        or path.startswith("/api/auth/")
+    )
+    if path.startswith("/api/") and not public_api:
+        token = request.cookies.get(SESSION_COOKIE)
+        db = SessionLocal()
+        try:
+            user = get_user_from_token(db, token)
+        finally:
+            db.close()
+        if not user:
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Sign in to use Nestora design tools"},
+            )
+    return await call_next(request)
+
+
+@app.post("/api/auth/register", status_code=status.HTTP_201_CREATED)
+def register(req: RegisterRequest, response: Response, db: Session = Depends(get_db)):
+    email = req.email.strip().lower()
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Name is required")
+    existing = db.query(UserModel).filter(UserModel.email == email).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="An account with this email already exists")
+    user = UserModel(name=name, email=email, password_hash=hash_password(req.password))
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    create_session(db, user, response)
+    return {"user": user.to_public_dict()}
+
+
+@app.post("/api/auth/login")
+def login(req: LoginRequest, response: Response, db: Session = Depends(get_db)):
+    email = req.email.strip().lower()
+    user = db.query(UserModel).filter(UserModel.email == email).first()
+    if not user or not verify_password(req.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    create_session(db, user, response)
+    return {"user": user.to_public_dict()}
+
+
+@app.post("/api/auth/logout")
+def logout(
+    response: Response,
+    nestora_session: str | None = Cookie(default=None),
+    db: Session = Depends(get_db),
+):
+    clear_session(db, response, nestora_session)
+    return {"ok": True}
+
+
+@app.get("/api/auth/me")
+def me(user=Depends(current_user_optional)):
+    return {"user": user.to_public_dict() if user else None}
+
 
 @app.get("/api/health")
 def health():

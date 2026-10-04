@@ -1,0 +1,123 @@
+/* Nestora authentication page — deliberately isolated from studio CSS. */
+#authGate.nestora-auth-gate {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 99999 !important;
+  display: block !important;
+  min-height: 100vh !important;
+  overflow-y: auto !important;
+  padding: 30px 44px 44px !important;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(171, 117, 68, .16), transparent 32rem),
+    linear-gradient(135deg, #f5eee5 0%, #eadfD2 52%, #ddcdbb 100%) !important;
+  color: #2b211a !important;
+  font-family: "DM Sans", Arial, sans-serif !important;
+}
+#authGate.nestora-auth-gate.hidden { display: none !important; }
+
+.nestora-auth-brand {
+  width: min(1180px, 100%) !important;
+  margin: 0 auto !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+.nestora-auth-logo {
+  width: 42px !important; height: 42px !important;
+  display: grid !important; place-items: center !important;
+  border-radius: 12px !important;
+  background: #2f2119 !important; color: #f3d8b6 !important;
+  font: 700 22px Georgia, serif !important;
+}
+.nestora-auth-brand strong {
+  display: block !important; color: #2d221b !important;
+  font-size: 13px !important; letter-spacing: .18em !important;
+}
+.nestora-auth-brand span {
+  display: block !important; margin-top: 3px !important;
+  color: #77695e !important; font-size: 12px !important;
+}
+.nestora-auth-layout {
+  width: min(1180px, 100%) !important;
+  min-height: calc(100vh - 120px) !important;
+  margin: 26px auto 0 !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.1fr) minmax(350px, 455px) !important;
+  gap: clamp(48px, 8vw, 112px) !important;
+  align-items: center !important;
+}
+.nestora-auth-hero { max-width: 650px !important; }
+.nestora-auth-kicker, .nestora-auth-eyebrow {
+  color: #965f31 !important; font-size: 11px !important;
+  font-weight: 800 !important; letter-spacing: .18em !important;
+}
+.nestora-auth-hero h1 {
+  margin: 14px 0 20px !important;
+  color: #2a2019 !important;
+  font: 600 clamp(44px, 5.4vw, 72px)/.99 Georgia, "Times New Roman", serif !important;
+  letter-spacing: -.035em !important;
+}
+.nestora-auth-hero > p {
+  max-width: 580px !important; margin: 0 !important;
+  color: #685b50 !important; font-size: 17px !important; line-height: 1.7 !important;
+}
+.nestora-auth-points {
+  display: flex !important; flex-wrap: wrap !important;
+  gap: 10px 22px !important; margin-top: 30px !important;
+  color: #51443a !important; font-size: 13px !important; font-weight: 700 !important;
+}
+.nestora-auth-points span::before { content: "✓"; margin-right: 7px; color: #965f31; }
+
+.nestora-auth-card {
+  width: 100% !important; padding: 38px !important;
+  border: 1px solid rgba(85,62,44,.15) !important;
+  border-radius: 22px !important;
+  background: rgba(255,253,249,.91) !important;
+  box-shadow: 0 28px 80px rgba(68,47,31,.14) !important;
+  color: #2b211a !important;
+}
+.nestora-auth-card h2 {
+  margin: 8px 0 8px !important; color: #2b211a !important;
+  font: 600 30px/1.15 Georgia, "Times New Roman", serif !important;
+}
+.nestora-auth-copy { margin: 0 0 26px !important; color: #75685e !important; line-height: 1.55 !important; }
+.nestora-auth-form { display: grid !important; gap: 17px !important; }
+.nestora-auth-field {
+  display: grid !important; grid-template-columns: 1fr !important;
+  gap: 8px !important; margin: 0 !important;
+  color: #44372e !important; font-size: 13px !important; font-weight: 750 !important;
+}
+.nestora-auth-field input {
+  display: block !important; width: 100% !important; height: 48px !important;
+  box-sizing: border-box !important; margin: 0 !important; padding: 0 14px !important;
+  border: 1px solid #cdbdac !important; border-radius: 10px !important;
+  background: #fffdfa !important; color: #2b211a !important;
+  font: 500 14px "DM Sans", Arial, sans-serif !important; box-shadow: none !important;
+}
+.nestora-auth-field input:focus {
+  outline: 2px solid rgba(150,95,49,.20) !important;
+  border-color: #965f31 !important;
+}
+.nestora-auth-field small { color: #88796c !important; font-size: 11px !important; font-weight: 500 !important; }
+.nestora-auth-primary {
+  width: 100% !important; height: 49px !important; margin: 2px 0 0 !important;
+  border: 0 !important; border-radius: 10px !important;
+  background: #34251c !important; color: #fff8ef !important;
+  font: 800 14px "DM Sans", Arial, sans-serif !important; cursor: pointer !important;
+}
+.nestora-auth-primary:hover { background: #493328 !important; }
+.nestora-auth-error { min-height: 18px !important; color: #a13d31 !important; font-size: 12px !important; }
+.nestora-auth-switch { margin: 22px 0 0 !important; text-align: center !important; color: #786a5e !important; font-size: 13px !important; }
+.nestora-auth-switch button {
+  border: 0 !important; padding: 0 !important; background: transparent !important;
+  color: #89572f !important; font: inherit !important; font-weight: 800 !important; cursor: pointer !important;
+}
+@media (max-width: 820px) {
+  #authGate.nestora-auth-gate { padding: 22px 20px 36px !important; }
+  .nestora-auth-layout {
+    min-height: auto !important; grid-template-columns: 1fr !important;
+    gap: 34px !important; margin-top: 48px !important;
+  }
+  .nestora-auth-hero h1 { font-size: clamp(38px, 11vw, 58px) !important; }
+  .nestora-auth-card { padding: 28px 22px !important; }
+}

@@ -12,6 +12,7 @@
     tailwind.config = { theme: { extend: { fontFamily: { sans: ['DM Sans','sans-serif'], serif: ['Playfair Display','serif'] } } } };
   </script>
   <link rel="stylesheet" href="/static/style.css?v=20260918d">
+  <link rel="stylesheet" href="/static/auth.css?v=20261004a">
 
 <script type="importmap">
 {
@@ -23,6 +24,75 @@
 </script>
 </head>
 <body>
+
+  <section id="authGate" class="nestora-auth-gate">
+    <header class="nestora-auth-brand">
+      <div class="nestora-auth-logo">N</div>
+      <div>
+        <strong>NESTORA</strong>
+        <span>AI Bathroom Studio</span>
+      </div>
+    </header>
+
+    <main class="nestora-auth-layout">
+      <section class="nestora-auth-hero">
+        <div class="nestora-auth-kicker">DESIGN WITH INTELLIGENCE</div>
+        <h1>Design a bathroom that understands your priorities.</h1>
+        <p>Plan the room, explore products, compare layouts and understand the reasoning behind each recommendation.</p>
+        <div class="nestora-auth-points">
+          <span>Spatial planning</span>
+          <span>Product intelligence</span>
+          <span>2D + 3D studio</span>
+        </div>
+      </section>
+
+      <section class="nestora-auth-card">
+        <div id="authLoginView">
+          <div class="nestora-auth-eyebrow">WELCOME BACK</div>
+          <h2>Sign in to Nestora</h2>
+          <p class="nestora-auth-copy">Continue to your bathroom design studio.</p>
+          <form id="loginForm" class="nestora-auth-form">
+            <label class="nestora-auth-field">
+              <span>Email address</span>
+              <input id="loginEmail" type="email" autocomplete="email" required>
+            </label>
+            <label class="nestora-auth-field">
+              <span>Password</span>
+              <input id="loginPassword" type="password" autocomplete="current-password" required>
+            </label>
+            <div id="loginError" class="nestora-auth-error"></div>
+            <button class="nestora-auth-primary" type="submit">Sign in</button>
+          </form>
+          <p class="nestora-auth-switch">New to Nestora? <button id="showRegister" type="button">Create an account</button></p>
+        </div>
+
+        <div id="authRegisterView" class="hidden">
+          <div class="nestora-auth-eyebrow">CREATE ACCOUNT</div>
+          <h2>Start designing with Nestora</h2>
+          <p class="nestora-auth-copy">Create an account to enter the design studio.</p>
+          <form id="registerForm" class="nestora-auth-form">
+            <label class="nestora-auth-field">
+              <span>Name</span>
+              <input id="registerName" type="text" autocomplete="name" maxlength="80" required>
+            </label>
+            <label class="nestora-auth-field">
+              <span>Email address</span>
+              <input id="registerEmail" type="email" autocomplete="email" maxlength="255" required>
+            </label>
+            <label class="nestora-auth-field">
+              <span>Password</span>
+              <input id="registerPassword" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+              <small>At least 8 characters.</small>
+            </label>
+            <div id="registerError" class="nestora-auth-error"></div>
+            <button class="nestora-auth-primary" type="submit">Create account</button>
+          </form>
+          <p class="nestora-auth-switch">Already have an account? <button id="showLogin" type="button">Sign in</button></p>
+        </div>
+      </section>
+    </main>
+  </section>
+
   <div id="toast" class="toast"></div>
 
   <header class="topbar">
@@ -36,6 +106,7 @@
     <div class="topbar-right">
       <span id="headerTheme" class="theme-pill">Modern Cozy</span>
       <button id="savedDesignsBtn" class="ghost-btn">My designs</button>
+      <button id="accountBtn" class="ghost-btn">Account</button>
       <button id="headerSaveBtn" class="ghost-btn hidden">Save design</button>
     </div>
   </header>

@@ -2080,3 +2080,94 @@ renderThemeCards();
 renderTileCards();
 setupInputs();
 wireStudioEvents();
+
+// --- Phase 2: auth-first gate (namespaced to avoid studio symbol collisions) ---
+let nestoraAuthUser = null;
+
+function nestoraShowAuthView(view) {
+  const register = view === 'register';
+  $('authLoginView')?.classList.toggle('hidden', register);
+  $('authRegisterView')?.classList.toggle('hidden', !register);
+}
+
+function nestoraUnlockStudio(user) {
+  nestoraAuthUser = user;
+  $('authGate')?.classList.add('hidden');
+  if ($('accountBtn')) $('accountBtn').textContent = user?.name || 'Account';
+}
+
+function nestoraLockStudio() {
+  nestoraAuthUser = null;
+  $('authGate')?.classList.remove('hidden');
+  nestoraShowAuthView('login');
+  if ($('accountBtn')) $('accountBtn').textContent = 'Account';
+}
+
+async function nestoraAuthRequest(endpoint, payload) {
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || 'Authentication failed');
+  return data;
+}
+
+$('showRegister')?.addEventListener('click', () => nestoraShowAuthView('register'));
+$('showLogin')?.addEventListener('click', () => nestoraShowAuthView('login'));
+
+$('loginForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if ($('loginError')) $('loginError').textContent = '';
+  try {
+    const data = await nestoraAuthRequest('/api/auth/login', {
+      email: $('loginEmail').value.trim(),
+      password: $('loginPassword').value
+    });
+    nestoraUnlockStudio(data.user);
+    if (typeof toast === 'function') toast('Welcome back');
+  } catch (error) {
+    if ($('loginError')) $('loginError').textContent = error.message;
+  }
+});
+
+$('registerForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if ($('registerError')) $('registerError').textContent = '';
+  try {
+    const data = await nestoraAuthRequest('/api/auth/register', {
+      name: $('registerName').value.trim(),
+      email: $('registerEmail').value.trim(),
+      password: $('registerPassword').value
+    });
+    nestoraUnlockStudio(data.user);
+    if (typeof toast === 'function') toast('Account created');
+  } catch (error) {
+    if ($('registerError')) $('registerError').textContent = error.message;
+  }
+});
+
+$('accountBtn')?.addEventListener('click', async () => {
+  if (!nestoraAuthUser) {
+    nestoraLockStudio();
+    return;
+  }
+  if (!window.confirm(`Sign out of ${nestoraAuthUser.email}?`)) return;
+  await fetch('/api/auth/logout', {method: 'POST'});
+  nestoraLockStudio();
+});
+
+async function nestoraRestoreSession() {
+  try {
+    const response = await fetch('/api/auth/me');
+    const data = await response.json();
+    if (data.user) nestoraUnlockStudio(data.user);
+    else nestoraLockStudio();
+  } catch (error) {
+    nestoraLockStudio();
+  }
+}
+
+nestoraRestoreSession();
+

@@ -1,7 +1,35 @@
 import json
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, Text, DateTime, Boolean, JSON
+from sqlalchemy import Column, Integer, String, Float, Text, DateTime, Boolean, JSON, ForeignKey
 from database import Base
+
+
+class UserModel(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(80), nullable=False)
+    email = Column(String(255), nullable=False, unique=True, index=True)
+    password_hash = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def to_public_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "email": self.email,
+            "createdAt": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class UserSessionModel(Base):
+    __tablename__ = "user_sessions"
+
+    token = Column(String(128), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 
 class CatalogItemModel(Base):
     __tablename__ = "catalog_items"
