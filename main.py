@@ -359,7 +359,93 @@ def _hard_valid(r, placed, L, W, dz, rotation=0, front_inches=0, min_gap=5.0):
     return True
 
 
-def _candidate_local_score(r, rot, category, L, W, strategy, placed):
+
+_FIXTURE_INTENT_CATEGORY = {
+    "shower": "Shower & Tub",
+    "toilet": "Smart Toilet",
+    "vanity": "Vanity & Basin",
+    "tub": "Freestanding Tub",
+}
+
+def _fixture_key_for_category(category: str) -> Optional[str]:
+    for key, value in _FIXTURE_INTENT_CATEGORY.items():
+        if value == category:
+            return key
+    return None
+
+def _placement_preference(intelligence: Optional[Dict[str, Any]], category: str) -> Dict[str, Any]:
+    intelligence = intelligence or {}
+    fixture_key = _fixture_key_for_category(category)
+    if not fixture_key:
+        return {}
+    for pref in intelligence.get("placement_preferences") or []:
+        if isinstance(pref, dict) and pref.get("fixture") == fixture_key:
+            return pref
+    return {}
+
+def _distance_to_wall(r: Dict[str, float], wall: str, L: float, W: float) -> float:
+    wall = (wall or "").lower()
+    if wall == "left":
+        return r["x"]
+    if wall == "right":
+        return L - (r["x"] + r["w"])
+    if wall == "top":
+        return r["y"]
+    if wall == "bottom":
+        return W - (r["y"] + r["h"])
+    return 9999.0
+
+def _intent_candidate_score(
+    r: Dict[str, float],
+    category: str,
+    L: float,
+    W: float,
+    door: str,
+    intelligence: Optional[Dict[str, Any]],
+) -> float:
+    """Soft preference score only. It never makes invalid geometry valid."""
+    pref = _placement_preference(intelligence, category)
+    if not pref:
+        return 0.0
+
+    score = 0.0
+    preferred_wall = pref.get("preferred_wall")
+    if preferred_wall:
+        distance = _distance_to_wall(r, preferred_wall, L, W)
+        score += max(0.0, 72.0 - distance * 2.4)
+
+    zone = (pref.get("preferred_zone") or "").lower()
+    center_x = r["x"] + r["w"] / 2
+    center_y = r["y"] + r["h"] / 2
+    if zone == "center":
+        score += max(0.0, 48.0 - math.hypot(center_x - L/2, center_y - W/2))
+    elif zone in {"back", "top"}:
+        score += max(0.0, 42.0 - r["y"])
+    elif zone in {"front", "bottom"}:
+        score += max(0.0, 42.0 - (W - (r["y"] + r["h"])))
+
+    if pref.get("avoid_entrance"):
+        dz = door_zone(L, W, door)
+        door_cx = dz["x"] + dz["w"] / 2
+        door_cy = dz["y"] + dz["h"] / 2
+        distance = math.hypot(center_x - door_cx, center_y - door_cy)
+        score += min(72.0, distance * 0.55)
+
+    return score
+
+def _locked_position(
+    intelligence: Optional[Dict[str, Any]],
+    category: str,
+) -> Optional[Dict[str, Any]]:
+    intelligence = intelligence or {}
+    fixture_key = _fixture_key_for_category(category)
+    if not fixture_key or fixture_key not in (intelligence.get("locked_fixtures") or []):
+        return None
+    position = (intelligence.get("locked_positions") or {}).get(fixture_key)
+    return position if isinstance(position, dict) else None
+
+
+def _candidate_local_score(r, rot, category, L, W, strategy, placed, door=None, intelligence=None):
     cx,cy=r["x"]+r["w"]/2,r["y"]+r["h"]/2
     center=math.hypot(cx-L/2,cy-W/2)
     wall=min(r["x"],r["y"],L-r["x"]-r["w"],W-r["y"]-r["h"])
@@ -376,9 +462,11 @@ def _candidate_local_score(r, rot, category, L, W, strategy, placed):
         gap=math.hypot(dx,dy)
         if gap<12: score-=45
         elif gap<20: score-=12
+    if door is not None:
+        score += _intent_candidate_score(r, category, L, W, door, intelligence)
     return score
 
-def score_layout(layout: List[Dict[str, Any]], L: float, W: float, door: str, strategy: str = "open_balanced") -> float:
+def score_layout(layout: List[Dict[str, Any]], L: float, W: float, door: str, strategy: str = "open_balanced", intelligence: Optional[Dict[str, Any]] = None) -> float:
     score = 0.0
     dz = door_zone(L, W, door)
     cx, cy = L / 2, W / 2
@@ -396,6 +484,7 @@ def score_layout(layout: List[Dict[str, Any]], L: float, W: float, door: str, st
         if strategy == "circulation_first": score += min(center_dist/3, 22)
         if strategy == "symmetry": score += max(0, 14-abs((r["x"]+r["w"]/2)-cx))*0.8
         if strategy == "compact_comfort": score += max(0, 12-center_dist/3)
+        score += _intent_candidate_score(r, cat, L, W, door, intelligence)
 
     floor_entries = [e for e in layout if e["item"].get("mountingType", "floor") != "wall_hung"]
     for i,a in enumerate(floor_entries):
@@ -423,7 +512,7 @@ def score_layout(layout: List[Dict[str, Any]], L: float, W: float, door: str, st
     return score
 
 
-def generate_candidate(bundle: List[Dict[str, Any]], L: float, W: float, door: str, strategy: str):
+def generate_candidate(bundle: List[Dict[str, Any]], L: float, W: float, door: str, strategy: str, intelligence: Optional[Dict[str, Any]] = None):
     """Constraint-first planner. Core floor fixtures are never allowed to overlap,
     block the door, or squeeze through a sub-5-inch geometric gap. Wall-mounted
     accessories are attached after the floor plan is solved so they cannot corrupt it.
@@ -436,22 +525,33 @@ def generate_candidate(bundle: List[Dict[str, Any]], L: float, W: float, door: s
     if strategy=="storage_first": floor_categories.sort(key=lambda c: {"Vanity & Basin":0,"Smart Toilet":1,"Shower & Tub":2,"Freestanding Tub":3}.get(c,9))
     elif strategy=="spa_corner": floor_categories.sort(key=lambda c: {"Shower & Tub":0,"Freestanding Tub":1,"Vanity & Basin":2,"Smart Toilet":3}.get(c,9))
 
+    # Locked fixtures are solved first. Their captured coordinates are the only
+    # candidate allowed for that fixture; all other fixtures must fit around them.
+    floor_categories.sort(key=lambda c: 0 if _locked_position(intelligence, c) else 1)
+
     best_layout=[]; best_score=-1e18
     def search(idx, placed, entries, running):
         nonlocal best_layout,best_score
         if idx==len(floor_categories):
-            final=running+score_layout(entries,L,W,door,strategy)
+            final=running+score_layout(entries,L,W,door,strategy,intelligence)
             if final>best_score: best_score=final; best_layout=list(entries)
             return
         cat=floor_categories[idx]; item=next(i for i in bundle if i["category"]==cat)
         candidates=[]
-        for x,y,rot in candidate_positions(item,L,W,cat,strategy):
+        locked = _locked_position(intelligence, cat)
+        raw_positions = (
+            [(float(locked.get("x", 0)), float(locked.get("y", 0)), float(locked.get("rotation", 0)))]
+            if locked else candidate_positions(item,L,W,cat,strategy)
+        )
+        for x,y,rot in raw_positions:
             r=footprint(item,x,y,rot)
-            r["x"]=max(0,min(r["x"],L-r["w"])); r["y"]=max(0,min(r["y"],W-r["h"]))
+            # Normal candidates may be clamped; a locked coordinate must remain exact.
+            if not locked:
+                r["x"]=max(0,min(r["x"],L-r["w"])); r["y"]=max(0,min(r["y"],W-r["h"]))
             front=float(item.get("clearanceFrontInches") or 0)
             if _hard_valid(r,placed,L,W,dz,rot,front,5.0):
                 r["_service"]=_service_zone(r,rot,front)
-                candidates.append((_candidate_local_score(r,rot,cat,L,W,strategy,placed),r,rot))
+                candidates.append((_candidate_local_score(r,rot,cat,L,W,strategy,placed,door,intelligence),r,rot))
         for local,r,rot in sorted(candidates,reverse=True,key=lambda z:z[0])[:10]:
             search(idx+1,placed+[r],entries+[_make_layout_entry(item,r["x"],r["y"],rot)],running+local)
     search(0,[],[],0)
@@ -506,14 +606,14 @@ def _normalize_layout_bounds(layout: List[Dict[str, Any]], L: float, W: float, m
     return layout
 
 
-def compute_plan(bundle: List[Dict[str, Any]], L: float, W: float, door: str, strategy: str = "open_balanced"):
+def compute_plan(bundle: List[Dict[str, Any]], L: float, W: float, door: str, strategy: str = "open_balanced", intelligence: Optional[Dict[str, Any]] = None):
     """Canonical spatial planner used by the API.
 
     Large rooms use the architectural clustering composition above; compact rooms
     use the candidate/clearance solver. Keeping this behind one function makes the
     layout policy explicit and keeps the endpoint independent of the strategy details.
     """
-    return generate_candidate(bundle, L, W, door, strategy)
+    return generate_candidate(bundle, L, W, door, strategy, intelligence)
 
 def choose_bundle(db: Session, theme: str, budget: float, intelligence: Optional[Dict[str, Any]] = None):
     """Choose a themed bundle that actually responds to the target budget.
@@ -673,8 +773,8 @@ def plan(req: PlanRequest, db: Session = Depends(get_db)):
     ]
     designs = []
     for strategy, name in strategies:
-        layout = _normalize_layout_bounds(compute_plan(bundle, L, W, req.doorPosition, strategy), L, W)
-        score = score_layout(layout, L, W, req.doorPosition, strategy)
+        layout = _normalize_layout_bounds(compute_plan(bundle, L, W, req.doorPosition, strategy, req.designIntelligence), L, W)
+        score = score_layout(layout, L, W, req.doorPosition, strategy, req.designIntelligence)
         if layout:
             designs.append({"id": f"design-{uuid.uuid4().hex[:8]}", "name": name, "strategy": strategy, "score": round(score,1), "layout": layout})
     # Prefer three intentionally different planning philosophies, then use score/diversity as fallback.
@@ -723,6 +823,12 @@ def plan(req: PlanRequest, db: Session = Depends(get_db)):
         "marbleDesign": req.marbleDesign,
         "tileColor": req.tileColor,
         "designIntelligence": req.designIntelligence,
+        "spatialIntent": {
+            "lockedFixtures": req.designIntelligence.get("locked_fixtures") or [],
+            "placementPreferences": req.designIntelligence.get("placement_preferences") or [],
+            "hardConstraintsApplied": bool(req.designIntelligence.get("locked_fixtures")),
+            "softPreferencesApplied": bool(req.designIntelligence.get("placement_preferences")),
+        },
         "imageAnalysis": req.imageAnalysis,
     }
 

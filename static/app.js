@@ -319,10 +319,15 @@ async function generatePlan() {
   state.roomLengthFt = Number($('roomLength').value) || 10;
   state.roomWidthFt = Number($('roomWidth').value) || 8;
   state.budget = Number($('budget').value) || 8500;
+  // Preserve Phase 2/6 rich intent fields (fixture locks + placement preferences)
+  // while updating the basic controls from the setup form.
   state.designIntelligence = {
+    ...(state.designIntelligence || {}),
     storage_priority: $('diStorage').value,
-    bath_preference: $('diBath').value, accessibility: $('diAccessibility').value,
-    plumbing_flexibility: $('diPlumbing').value, circulation_priority: $('diCirculation').value
+    bath_preference: $('diBath').value,
+    accessibility: $('diAccessibility').value,
+    plumbing_flexibility: $('diPlumbing').value,
+    circulation_priority: $('diCirculation').value
   };
   setLoading(true);
   try {
@@ -1697,10 +1702,45 @@ async function requestSuggestions() {
 }
 
 
+
+const INTENT_FIXTURE_CATEGORY = {
+  shower: 'Shower & Tub',
+  toilet: 'Smart Toilet',
+  vanity: 'Vanity & Basin',
+  tub: 'Freestanding Tub'
+};
+
+function captureLockedFixturePositions(designIntelligence) {
+  const di = {...(designIntelligence || {})};
+  const locks = Array.isArray(di.locked_fixtures) ? di.locked_fixtures : [];
+  const positions = {...(di.locked_positions || {})};
+
+  for (const fixture of locks) {
+    const category = INTENT_FIXTURE_CATEGORY[fixture];
+    const entry = state.plan?.layout?.find(e => e.item?.category === category);
+    if (entry) {
+      positions[fixture] = {
+        x: Number(entry.x),
+        y: Number(entry.y),
+        rotation: Number(entry.rotation || 0)
+      };
+    }
+  }
+
+  // Remove stale coordinates if a fixture is no longer locked.
+  Object.keys(positions).forEach(key => {
+    if (!locks.includes(key)) delete positions[key];
+  });
+
+  di.locked_positions = positions;
+  return di;
+}
+
+
 async function refineWithAI(){
   const input=$('aiRefineInput'); const instruction=input?.value.trim(); if(!instruction||!state.plan) return;
   const btn=$('aiRefineBtn'); if(btn) btn.disabled=true;
-  try{ const res=await fetch('/api/designs/refine',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({instruction,designIntelligence:state.designIntelligence})}); if(!res.ok) throw new Error(await res.text()); const data=await res.json(); state.designIntelligence={...state.designIntelligence,...data.designIntelligence};
+  try{ const res=await fetch('/api/designs/refine',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({instruction,designIntelligence:state.designIntelligence})}); if(!res.ok) throw new Error(await res.text()); const data=await res.json(); state.designIntelligence=captureLockedFixturePositions({...state.designIntelligence,...data.designIntelligence});
     const map={diStorage:'storage_priority',diBath:'bath_preference',diAccessibility:'accessibility',diPlumbing:'plumbing_flexibility',diCirculation:'circulation_priority'}; Object.entries(map).forEach(([id,k])=>{if($(id)&&state.designIntelligence[k]!=null)$(id).value=state.designIntelligence[k]});
     if(input) input.value=''; toast(data.message||'Design request applied.','success'); await generatePlan();
   }catch(e){console.error(e);toast('Nestora could not apply that refinement.','error');}finally{if(btn)btn.disabled=false;}
