@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from intent.executor import compile_design_intent
 from ai.service import (generate_design_intelligence,interpret_refinement,analyze_image,)
 from database import Base, SessionLocal, engine, get_db, migrate_schema
 from models import CatalogItemModel, DesignModel, UserModel
@@ -445,6 +446,25 @@ def _locked_position(
     return position if isinstance(position, dict) else None
 
 
+def _operation_target(intelligence: Optional[Dict[str, Any]], category: str) -> Optional[Dict[str, Any]]:
+    intelligence = intelligence or {}
+    fixture_key = _fixture_key_for_category(category)
+    if not fixture_key:
+        return None
+    target = (intelligence.get("operation_positions") or {}).get(fixture_key)
+    return target if isinstance(target, dict) else None
+
+def _operation_target_score(r: Dict[str, float], category: str, intelligence: Optional[Dict[str, Any]]) -> float:
+    target = _operation_target(intelligence, category)
+    if not target:
+        return 0.0
+    tx, ty = float(target.get("x", r["x"])), float(target.get("y", r["y"]))
+    distance = math.hypot(r["x"] - tx, r["y"] - ty)
+    # Strong soft reward: exact requested operations win when physically valid,
+    # while impossible swaps/moves may fall back to the nearest valid candidate.
+    return max(0.0, 500.0 - distance * 8.0)
+
+
 def _candidate_local_score(r, rot, category, L, W, strategy, placed, door=None, intelligence=None):
     cx,cy=r["x"]+r["w"]/2,r["y"]+r["h"]/2
     center=math.hypot(cx-L/2,cy-W/2)
@@ -464,6 +484,7 @@ def _candidate_local_score(r, rot, category, L, W, strategy, placed, door=None, 
         elif gap<20: score-=12
     if door is not None:
         score += _intent_candidate_score(r, category, L, W, door, intelligence)
+        score += _operation_target_score(r, category, intelligence)
     return score
 
 def score_layout(layout: List[Dict[str, Any]], L: float, W: float, door: str, strategy: str = "open_balanced", intelligence: Optional[Dict[str, Any]] = None) -> float:
@@ -539,10 +560,17 @@ def generate_candidate(bundle: List[Dict[str, Any]], L: float, W: float, door: s
         cat=floor_categories[idx]; item=next(i for i in bundle if i["category"]==cat)
         candidates=[]
         locked = _locked_position(intelligence, cat)
-        raw_positions = (
-            [(float(locked.get("x", 0)), float(locked.get("y", 0)), float(locked.get("rotation", 0)))]
-            if locked else candidate_positions(item,L,W,cat,strategy)
-        )
+        operation_target = _operation_target(intelligence, cat)
+        if locked:
+            raw_positions = [(float(locked.get("x", 0)), float(locked.get("y", 0)), float(locked.get("rotation", 0)))]
+        else:
+            raw_positions = list(candidate_positions(item,L,W,cat,strategy))
+            if operation_target:
+                raw_positions.insert(0, (
+                    float(operation_target.get("x", 0)),
+                    float(operation_target.get("y", 0)),
+                    float(operation_target.get("rotation", 0)),
+                ))
         for x,y,rot in raw_positions:
             r=footprint(item,x,y,rot)
             # Normal candidates may be clamped; a locked coordinate must remain exact.
@@ -759,6 +787,7 @@ def catalog(db: Session = Depends(get_db)):
 @app.post("/api/plan")
 def plan(req: PlanRequest, db: Session = Depends(get_db)):
     L, W = req.roomLengthFt * 12, req.roomWidthFt * 12
+    req.designIntelligence = compile_design_intent(req.designIntelligence)
     bundle = choose_bundle(db, req.theme, req.budget, req.designIntelligence)
     if not bundle:
         raise HTTPException(500, "Catalog is empty. Run seed.py.")
@@ -1011,7 +1040,12 @@ def refine_design(req: RefineRequest):
 
     except Exception as exc:
         print(f"Gemini refinement error: {exc}")
-    return {"designIntelligence":di,"changes":changes,"message":"I translated your request into planner constraints. Regenerating will re-run geometry validation and product matching."}
+    di = compile_design_intent(di)
+    return {
+        "designIntelligence": di,
+        "changes": changes,
+        "message": "I translated your request into design intent. Nestora will attempt it and keep only spatially valid results."
+    }
 
 
 @app.post("/api/designs/suggestions")

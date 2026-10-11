@@ -1736,11 +1736,35 @@ function captureLockedFixturePositions(designIntelligence) {
   return di;
 }
 
+function captureOperationPositions(designIntelligence) {
+  const di = {...(designIntelligence || {})};
+  const operations = Array.isArray(di.operations) ? di.operations : [];
+  const positions = {};
+  const currentByFixture = {};
+
+  Object.entries(INTENT_FIXTURE_CATEGORY).forEach(([fixture, category]) => {
+    const entry = state.plan?.layout?.find(e => e.item?.category === category);
+    if (entry) currentByFixture[fixture] = {
+      x: Number(entry.x), y: Number(entry.y), rotation: Number(entry.rotation || 0)
+    };
+  });
+
+  operations.forEach(op => {
+    if (op?.type === 'swap' && op.fixture && op.target_fixture) {
+      if (currentByFixture[op.target_fixture]) positions[op.fixture] = {...currentByFixture[op.target_fixture]};
+      if (currentByFixture[op.fixture]) positions[op.target_fixture] = {...currentByFixture[op.fixture]};
+    }
+  });
+
+  di.operation_positions = positions;
+  return di;
+}
+
 
 async function refineWithAI(){
   const input=$('aiRefineInput'); const instruction=input?.value.trim(); if(!instruction||!state.plan) return;
   const btn=$('aiRefineBtn'); if(btn) btn.disabled=true;
-  try{ const res=await fetch('/api/designs/refine',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({instruction,designIntelligence:state.designIntelligence})}); if(!res.ok) throw new Error(await res.text()); const data=await res.json(); state.designIntelligence=captureLockedFixturePositions({...state.designIntelligence,...data.designIntelligence});
+  try{ const res=await fetch('/api/designs/refine',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({instruction,designIntelligence:state.designIntelligence})}); if(!res.ok) throw new Error(await res.text()); const data=await res.json(); state.designIntelligence=captureOperationPositions(captureLockedFixturePositions({...state.designIntelligence,...data.designIntelligence}));
     const map={diStorage:'storage_priority',diBath:'bath_preference',diAccessibility:'accessibility',diPlumbing:'plumbing_flexibility',diCirculation:'circulation_priority'}; Object.entries(map).forEach(([id,k])=>{if($(id)&&state.designIntelligence[k]!=null)$(id).value=state.designIntelligence[k]});
     if(input) input.value=''; toast(data.message||'Design request applied.','success'); await generatePlan();
   }catch(e){console.error(e);toast('Nestora could not apply that refinement.','error');}finally{if(btn)btn.disabled=false;}
@@ -2271,6 +2295,13 @@ function renderIntelligenceWorkspace(data = state.currentIntelligence || {}) {
     fixtureItems.push(
       `<div class="intel-fixture-row"><b>${escapeHtml(intelLabel(p.fixture || 'Fixture'))}</b><span>${escapeHtml(details.join(' · ') || 'Placement preference')}</span></div>`
     );
+  });
+  (Array.isArray(di.operations) ? di.operations : []).forEach(op => {
+    const target = op.target_fixture ? ` · ${intelLabel(op.target_fixture)}` : '';
+    fixtureItems.push(`<div class="intel-fixture-row"><b>${escapeHtml(intelLabel(op.fixture || 'Fixture'))}</b><span>${escapeHtml(intelLabel(op.type || 'operation') + target)}</span></div>`);
+  });
+  (Array.isArray(di.goals) ? di.goals : []).forEach(goal => {
+    fixtureItems.push(`<div class="intel-fixture-row"><b>Goal</b><span>${escapeHtml(intelLabel(goal.type || 'design goal'))}</span></div>`);
   });
   if ($('intelFixtureIntent')) {
     $('intelFixtureIntent').innerHTML = fixtureItems.join('') ||
